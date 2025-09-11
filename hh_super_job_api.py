@@ -19,11 +19,11 @@ def hh_request_predict_rub_salary(lang, url, page=0):
     return response.json()
 
 
-def get_superjob_vacancies(api_key, lang, page=0):
+def get_superjob_vacancies(super_job_token, lang, page=0):
     period_in_days = 30
     catalogue_count = 48
     url = "https://api.superjob.ru/2.0/vacancies/"
-    headers = {"X-Api-App-Id": api_key}
+    headers = {"X-Api-App-Id": super_job_token}
     params = {
         "keyword": f"Программист {lang}",
         "page": page,
@@ -67,7 +67,7 @@ def job_request_and_result(list_language):
         total_vacancies = 0
 
         for page in count(0):
-            job_vacancies = get_superjob_vacancies(API_KEY, lang, page)
+            job_vacancies = get_superjob_vacancies(SUPER_JOB_TOKEN, lang, page)
             job_total_vacancies = job_vacancies.get("total", 0)
             job_vacancies = job_vacancies.get("objects", [])
             if not job_vacancies:
@@ -191,7 +191,7 @@ def job_create_table(title, job_statistics):
 
 if __name__ == "__main__":
     load_dotenv()
-    API_KEY = os.environ["API_KEY"]
+    SUPER_JOB_TOKEN = os.environ["SUPER_JOB_TOKEN"]
     list_language = [
         "JavaScript",
         "Java",
