@@ -7,8 +7,9 @@ from dotenv import load_dotenv
 
 
 def hh_request_predict_rub_salary(lang, url, page=0):
+    moscow_zone = 1
     payload = {
-        "area": "1",
+        "area": f"{moscow_zone}",
         "page": page,
         "text": f"Программист {lang}",
         "only_with_salary": True,
@@ -37,18 +38,6 @@ def get_superjob_vacancies(super_job_token, lang, page=0):
     return response.json()
 
 
-def hh_predict_rub_salary(salary_from=None, salary_to=None):
-    if salary_from and salary_to:
-        hh_salary_calculation = int((salary_to + salary_from) / 2)
-    elif salary_from:
-        hh_salary_calculation = int(1.2 * salary_from)
-    elif salary_to:
-        hh_salary_calculation = int(0.8 * salary_to)
-    else:
-        print("None")
-    return hh_salary_calculation
-
-
 def job_predict_rub_salary(salary_from=None, salary_to=None):
     if salary_from and salary_to:
         return int((salary_to + salary_from) / 2)
@@ -59,15 +48,15 @@ def job_predict_rub_salary(salary_from=None, salary_to=None):
     return None
 
 
-def job_request_and_result(list_language):
+def sj_get_statistic_vacancies(languages):
     job_vacancies_by_language = {}
 
-    for lang in list_language:
+    for lang in language:
         salaries = []
         total_vacancies = 0
 
         for page in count(0):
-            job_vacancies = get_superjob_vacancies(SUPER_JOB_TOKEN, lang, page)
+            job_vacancies = get_superjob_vacancies(super_job_token, lang, page)
             job_total_vacancies = job_vacancies.get("total", 0)
             job_vacancies = job_vacancies.get("objects", [])
             if not job_vacancies:
@@ -97,13 +86,13 @@ def job_request_and_result(list_language):
     return job_vacancies_by_language
 
 
-def hh_get_list_vacancies(page=0):
-    for lang in list_language:
+def hh_get_statistic_vacancies(moscow_zone, page=0):
+    for lang in language:
 
-        salary_by_vacancies = []
+        salaries_by_vacancies = []
         for page in count(0):
             payload = {
-                "area": "1",
+                "area": f"{moscow_zone}",
                 "text": f"Программист {lang}",
                 "page": page,
                 "only_with_salary": True,
@@ -111,12 +100,10 @@ def hh_get_list_vacancies(page=0):
             time.sleep(0.3)
             response = requests.get(url, params=payload)
             response.raise_for_status()
-            count_total_vacancies = response.json()
+            total_count_vacancies = response.json()
 
-            if page >= count_total_vacancies["pages"] - 1:
+            if page >= total_count_vacancies["pages"] - 1:
                 break
-
-        for page in count(0):
             vacancies = hh_request_predict_rub_salary(lang, url, page=page)
             if page >= vacancies["pages"] - 1:
                 break
@@ -124,26 +111,39 @@ def hh_get_list_vacancies(page=0):
             for vacancy in vacancies["items"]:
                 salary = vacancy.get("salary")
                 if salary and salary.get("currency") == "RUR":
-                    predicted_salary = hh_predict_rub_salary(
+                    predicted_salary = job_predict_rub_salary(
                         salary.get("from"), salary.get("to")
                     )
-                    if predicted_salary is not None:
-                        salary_by_vacancies.append(predicted_salary)
+                    if predicted_salary :
+                        salaries_by_vacancies.append(predicted_salary)
 
         average_salary = None
-        if salary_by_vacancies:
-            average_salary = int(sum(salary_by_vacancies) / len(salary_by_vacancies))
+        if salaries_by_vacancies:
+            average_salary = int(
+                sum(salaries_by_vacancies) / len(salaries_by_vacancies)
+            )
 
         vacancies_by_language[lang] = {
-            "vacancies_found": count_total_vacancies.get("found"),
-            "vacancies_processed": len(salary_by_vacancies),
+            "vacancies_found": total_count_vacancies.get("found"),
+            "vacancies_processed": len(salaries_by_vacancies),
             "average_salary": average_salary,
         }
 
     return vacancies_by_language
 
 
-def hh_create_table(title, hh_statistics):
+def create_table(hh_statistics, job_statistics):
+    hh_title = "HeadHunter Moscow"
+    sj_title = "SuperJob Moscow"
+
+    hh_table_contents = [
+        [
+            "Язык программирования",
+            "Вакансий найдено",
+            "Вакансий обработано",
+            "Средняя зарплата",
+        ]
+    ]
     table_contents = [
         [
             "Язык программирования",
@@ -152,9 +152,8 @@ def hh_create_table(title, hh_statistics):
             "Средняя зарплата",
         ]
     ]
-
     for language, vacancsies in hh_statistics.items():
-        table_contents.append(
+        hh_table_contents.append(
             [
                 language,
                 vacancsies["vacancies_found"],
@@ -162,19 +161,7 @@ def hh_create_table(title, hh_statistics):
                 vacancsies["average_salary"],
             ]
         )
-    table = AsciiTable(table_contents, title)
-    return table.table
-
-
-def job_create_table(title, job_statistics):
-    table_contents = [
-        [
-            "Язык программирования",
-            "Вакансий найдено",
-            "Вакансий обработано",
-            "Средняя зарплата",
-        ]
-    ]
+    hh_table = AsciiTable(hh_table_contents, hh_title)
 
     for language, vacancsies in job_statistics.items():
         table_contents.append(
@@ -185,14 +172,15 @@ def job_create_table(title, job_statistics):
                 vacancsies["average_salary"],
             ]
         )
-    table = AsciiTable(table_contents, title)
-    return table.table
+    sj_table = AsciiTable(table_contents, sj_title)
+    return hh_table.table, sj_table.table
 
 
 if __name__ == "__main__":
     load_dotenv()
-    SUPER_JOB_TOKEN = os.environ["SUPER_JOB_TOKEN"]
-    list_language = [
+    super_job_token = os.environ["SUPER_JOB_TOKEN"]
+    moscow_zone = 1
+    language = [
         "JavaScript",
         "Java",
         "Python",
@@ -203,14 +191,14 @@ if __name__ == "__main__":
         "C",
         "Go",
     ]
-    averages_salarys = []
-    TITLE = "HeadHunter Moscow"
-    SJ_TITLE = "SuperJob Moscow"
+    averages_salaries = []
     vacancies_by_language = {}
-    list_total_vacancies = []
+    total_vacancies = []
     url = "https://api.hh.ru/vacancies"
 
-    job_statistics = job_request_and_result(list_language)
-    hh_statistics = hh_get_list_vacancies()
-    print(hh_create_table(TITLE, hh_statistics))
-    print(job_create_table(SJ_TITLE, job_statistics))
+    job_statistics = sj_get_statistic_vacancies(language)
+    hh_statistics = hh_get_statistic_vacancies(moscow_zone)
+    hh_table, sj_table = create_table(hh_statistics, job_statistics)
+    print(hh_table)
+    print(sj_table)
+
