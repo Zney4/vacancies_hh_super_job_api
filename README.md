@@ -18,7 +18,7 @@ pip install -r requirements.txt
 Файл .env      
 В нём надо указать переменную с api токеном.
 ```
-API_KEY=example
+SUPER_JOB_TOKEN=example
 ```
 Чтобы получить апи токен для скрипта нам нужно зарегестрироваться на сайте Super_job и подать заявку на его получения https://api.superjob.ru/?from_refresh=1.
 
