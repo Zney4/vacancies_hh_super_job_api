@@ -6,7 +6,7 @@ import os
 from dotenv import load_dotenv
 
 
-def hh_request_predict_rub_salary(lang, url, page=0):
+def hh_get_request_vacancies(lang, url, page=0):
     moscow_zone = 1
     payload = {
         "area": f"{moscow_zone}",
@@ -38,7 +38,7 @@ def get_superjob_vacancies(super_job_token, lang, page=0):
     return response.json()
 
 
-def job_predict_rub_salary(salary_from=None, salary_to=None):
+def determining_salaries_for_vacancies(salary_from=None, salary_to=None):
     if salary_from and salary_to:
         return int((salary_to + salary_from) / 2)
     elif salary_from:
@@ -48,7 +48,7 @@ def job_predict_rub_salary(salary_from=None, salary_to=None):
     return None
 
 
-def sj_get_statistic_vacancies(languages):
+def sj_get_statistic_vacancies(super_job_token, languages):
     job_vacancies_by_language = {}
 
     for lang in language:
@@ -66,7 +66,7 @@ def sj_get_statistic_vacancies(languages):
                 if vacancy.get("currency") != "rub":
                     continue
 
-                salary = job_predict_rub_salary(
+                salary = determining_salaries_for_vacancies(
                     vacancy.get("payment_from"), vacancy.get("payment_to")
                 )
 
@@ -100,21 +100,21 @@ def hh_get_statistic_vacancies(moscow_zone, page=0):
             time.sleep(0.3)
             response = requests.get(url, params=payload)
             response.raise_for_status()
-            total_count_vacancies = response.json()
+            found_count_vacancies = response.json()
 
-            if page >= total_count_vacancies["pages"] - 1:
+            if page >= found_count_vacancies["pages"] - 1:
                 break
-            vacancies = hh_request_predict_rub_salary(lang, url, page=page)
+            vacancies = hh_get_request_vacancies(lang, url, page=page)
             if page >= vacancies["pages"] - 1:
                 break
 
             for vacancy in vacancies["items"]:
                 salary = vacancy.get("salary")
                 if salary and salary.get("currency") == "RUR":
-                    predicted_salary = job_predict_rub_salary(
+                    predicted_salary = determining_salaries_for_vacancies(
                         salary.get("from"), salary.get("to")
                     )
-                    if predicted_salary :
+                    if predicted_salary:
                         salaries_by_vacancies.append(predicted_salary)
 
         average_salary = None
@@ -124,7 +124,7 @@ def hh_get_statistic_vacancies(moscow_zone, page=0):
             )
 
         vacancies_by_language[lang] = {
-            "vacancies_found": total_count_vacancies.get("found"),
+            "vacancies_found": found_count_vacancies.get("found"),
             "vacancies_processed": len(salaries_by_vacancies),
             "average_salary": average_salary,
         }
@@ -132,18 +132,7 @@ def hh_get_statistic_vacancies(moscow_zone, page=0):
     return vacancies_by_language
 
 
-def create_table(hh_statistics, job_statistics):
-    hh_title = "HeadHunter Moscow"
-    sj_title = "SuperJob Moscow"
-
-    hh_table_contents = [
-        [
-            "Язык программирования",
-            "Вакансий найдено",
-            "Вакансий обработано",
-            "Средняя зарплата",
-        ]
-    ]
+def create_table(title, statistics):
     table_contents = [
         [
             "Язык программирования",
@@ -152,18 +141,7 @@ def create_table(hh_statistics, job_statistics):
             "Средняя зарплата",
         ]
     ]
-    for language, vacancsies in hh_statistics.items():
-        hh_table_contents.append(
-            [
-                language,
-                vacancsies["vacancies_found"],
-                vacancsies["vacancies_processed"],
-                vacancsies["average_salary"],
-            ]
-        )
-    hh_table = AsciiTable(hh_table_contents, hh_title)
-
-    for language, vacancsies in job_statistics.items():
+    for language, vacancsies in statistics.items():
         table_contents.append(
             [
                 language,
@@ -172,13 +150,15 @@ def create_table(hh_statistics, job_statistics):
                 vacancsies["average_salary"],
             ]
         )
-    sj_table = AsciiTable(table_contents, sj_title)
-    return hh_table.table, sj_table.table
+    table = AsciiTable(table_contents, title)
+    return table.table
 
 
 if __name__ == "__main__":
     load_dotenv()
     super_job_token = os.environ["SUPER_JOB_TOKEN"]
+    hh_title = "HeadHunter Moscow"
+    sj_title = "SuperJob Moscow"
     moscow_zone = 1
     language = [
         "JavaScript",
@@ -196,9 +176,9 @@ if __name__ == "__main__":
     total_vacancies = []
     url = "https://api.hh.ru/vacancies"
 
-    job_statistics = sj_get_statistic_vacancies(language)
+    job_statistics = sj_get_statistic_vacancies(super_job_token, language)
     hh_statistics = hh_get_statistic_vacancies(moscow_zone)
-    hh_table, sj_table = create_table(hh_statistics, job_statistics)
+    hh_table = create_table(hh_title, hh_statistics)
+    sj_table = create_table(sj_title, job_statistics)
     print(hh_table)
     print(sj_table)
-
